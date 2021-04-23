@@ -34,7 +34,80 @@ async def daily(ctx, *args):
         await ctx.send(embed=embed)
         await addChips(ctx, chips, daily)
     else:
-        await nextDailyClaim(ctx)
+        await nextDailyClaim(ctx)        
+
+@bot.command()
+async def play(ctx, *args):
+    await accountExists(ctx)
+    deck = await deckCreation(constants.deck)
+    with open (f'{constants.userSavePath}{ctx.author.id}.txt','r') as f:
+        stuff = json.load(f)
+
+    menu = discord.Embed(
+        description = f"""WELCOME <@{ctx.author.id}> TO THE TABLE
+            2:3 PAYOUT ON BLACKJACK
+            DEALER STANDS ON 17
+        
+        """,
+        colour = discord.Colour.purple()
+        )
+    menu.set_author(name=f"{ctx.author.name} ", icon_url=ctx.author.avatar_url)
+    ui = await ctx.send(embed=menu)
+    await asyncio.sleep(3)
+    
+# SET CURRENT GAME ID    
+    global ongoingGames # REMOVE GAME AFTER DONE
+    ongoingGames = {}
+    ongoingGames.update({f'{ui.id}':[f'{ctx.author.id}']})
+
+#every new game iteration
+    dealerHand = []
+    playerHand = []
+    dealerValue = 0
+    playerValue = 0
+    deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
+    for i in range(2):
+        deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+
+    table = discord.Embed(
+        description = f"""<@{ctx.author.id}>
+        
+        Dealer Hand: {dealerHand} Dealer Value: {dealerValue}                                               
+        Player Hand: {playerHand} Player Value: {playerValue}
+        
+        """,
+        colour = discord.Colour.purple()
+        )
+    table.set_author(name=f"{ctx.author.name} ", icon_url=ctx.author.avatar_url)    
+    await ui.edit(embed=table)
+    await ui.add_reaction(constants.hit)
+    await ui.add_reaction(constants.stand)
+    await ui.add_reaction(constants.double)
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    if str(user.id) in ongoingGames[f'{reaction.message.id}']:
+        print("can play")
+    else:
+        print("cannot play")
+
+# CLOSE GAME
+async def closeGame(ctx):
+    None
+
+# DEALER DRAW CARDS
+async def dealerDraw(deck,dealerHand,dealerValue):
+    dealerValue += constants.deckValues[deck[0]]
+    dealerHand.append(deck[0])
+    deck.pop(0)
+    return deck,dealerHand,dealerValue
+
+# PLAYER DRAW CARDS
+async def playerDraw(deck,playerHand,playerValue):
+    playerValue += constants.deckValues[deck[0]]
+    playerHand.append(deck[0])
+    deck.pop(0)
+    return deck,playerHand,playerValue
 
 # CREATE ACCOUNT
 async def makeSave(ctx):
@@ -53,10 +126,6 @@ async def makeSave(ctx):
         'busts' : 0,
         'daily' : True,
         'lastDailyClaimTime' : '00:00:00'
-    })
-    stuff['settings'] = {}
-    stuff['settings'].update({
-        'deckCount' : 2
     })
     
     with open (f'{constants.userSavePath}{ctx.author.id}.txt','w') as f:
@@ -100,6 +169,21 @@ async def wait1day(ctx):
         stuff['account']['daily'] = True
     with open (f'{constants.userSavePath}{ctx.author.id}.txt','w') as f:
         json.dump(stuff,f, indent=4)
+
+# SHUFFLE CARDS INTO A DECK FOR USE
+async def deckCreation(deck):
+    bigDeck = deck*4 
+    deck = []
+    for i in range(len(bigDeck)):
+        card = random.randint(0,len(bigDeck)-1)
+        deck.append(bigDeck[card])
+        bigDeck.pop(card)
+    return deck
+
+# NOT IN USE CURRENTLY
+async def invalidArguments(ctx):
+    await ctx.send(f'<@{ctx.author.id}> Invalid arguments do -help for a list of commands')
+
 
 
 
