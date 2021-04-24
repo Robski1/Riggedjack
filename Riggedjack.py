@@ -77,17 +77,22 @@ async def play(ctx, *args):
     await ui.add_reaction(constants.hit)
     await ui.add_reaction(constants.stand)
     await ui.add_reaction(constants.double)
-    await playerTurn(ctx)
+
+    deck,playerHand,playerValue = await playerTurn(ctx,deck,playerHand,playerValue)
 
 # PLAYER TURN TO HIT/STAND/DOUBLE
-async def playerTurn(ctx):
-
+async def playerTurn(ctx,deck,playerHand,playerValue):
     try:
-        reaction, user = await bot.wait_for('reaction_add', check=lambda react,user: user==ctx.author and str(react.emoji) == f'<{constants.hit}>', timeout = 30.0)
+        reaction, user = await bot.wait_for('reaction_add', check=lambda react,user: user==ctx.author and str(react.emoji) in [f'<{constants.hit}>',f'<{constants.stand}>',f'<{constants.double}>'], timeout = 120.0)
     except asyncio.TimeoutError:
         print('timeout')
     else:
-        print("nice")
+        if reaction == f'<{constants.hit}>':
+            return deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+        if reaction == f'<{constants.stand}>':
+            return deck,playerHand,playerValue
+        if reaction == f'<{constants.double}>':
+            return deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
 
 # DEALER DRAW CARDS
 async def dealerDraw(deck,dealerHand,dealerValue):
