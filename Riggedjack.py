@@ -55,12 +55,6 @@ async def play(ctx, *args):
     ui = await ctx.send(embed=menu)
     await asyncio.sleep(3)
     
-# SET CURRENT GAME ID    
-    global ongoingGames # REMOVE GAME AFTER DONE
-    ongoingGames = {}
-    ongoingGames.update({f'{ui.id}':[f'{ctx.author.id}']})
-
-#every new game iteration
     dealerHand = []
     playerHand = []
     dealerValue = 0
@@ -83,17 +77,17 @@ async def play(ctx, *args):
     await ui.add_reaction(constants.hit)
     await ui.add_reaction(constants.stand)
     await ui.add_reaction(constants.double)
+    await playerTurn(ctx)
 
-@bot.event
-async def on_reaction_add(reaction, user):
-    if str(user.id) in ongoingGames[f'{reaction.message.id}']:
-        print("can play")
+# PLAYER TURN TO HIT/STAND/DOUBLE
+async def playerTurn(ctx):
+
+    try:
+        reaction, user = await bot.wait_for('reaction_add', check=lambda react,user: user==ctx.author and str(react.emoji) == f'<{constants.hit}>', timeout = 30.0)
+    except asyncio.TimeoutError:
+        print('timeout')
     else:
-        print("cannot play")
-
-# CLOSE GAME
-async def closeGame(ctx):
-    None
+        print("nice")
 
 # DEALER DRAW CARDS
 async def dealerDraw(deck,dealerHand,dealerValue):
