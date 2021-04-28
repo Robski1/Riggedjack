@@ -58,6 +58,7 @@ async def play(ctx, *args):
 #GAME LOGIC
     PlayerTurn = True
     DealerTurn = False
+    hasDouble = False
     roundEnd = False
     gameEnd = False # end whole game
     dealerHand = []
@@ -72,11 +73,15 @@ async def play(ctx, *args):
     # >>>>> dealer face down <<<<< #
 
     while roundEnd == False:
-        await updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui)
+        await updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui,PlayerTurn,hasDouble)
         if DealerTurn:
             deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
             DealerTurn = False
             PlayerTurn = True
+            continue
+        if hasDouble:
+            PlayerTurn = False
+            DealerTurn = True
             continue
         if PlayerTurn:
             choice = await playerTurn(ctx,deck,playerHand,playerValue)
@@ -85,7 +90,8 @@ async def play(ctx, *args):
             if choice == 'stand':
                 None
             if choice == 'double':
-                None 
+                deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+                hasDouble = True
             PlayerTurn = False
             DealerTurn = True
             continue
@@ -93,7 +99,7 @@ async def play(ctx, *args):
 
 #FUNCTIONS
 # UPDATE THE TABLE
-async def updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui):
+async def updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui,PlayerTurn,hasDouble):
     table = discord.Embed(
         description = f"""<@{ctx.author.id}>
         
@@ -105,6 +111,12 @@ async def updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui):
         )
     table.set_author(name=f"{ctx.author.name} ", icon_url=ctx.author.avatar_url)    
     await ui.edit(embed=table)
+
+    if hasDouble:
+        await ui.clear_reactions()
+        return
+    if PlayerTurn:
+        await ui.clear_reactions()
     await ui.add_reaction(constants.hit)
     await ui.add_reaction(constants.stand)
     await ui.add_reaction(constants.double)
@@ -115,6 +127,7 @@ async def playerTurn(ctx,deck,playerHand,playerValue):
         reaction, user = await bot.wait_for('reaction_add', check=lambda react,user: user==ctx.author and str(react.emoji) in [f'<{constants.hit}>',f'<{constants.stand}>',f'<{constants.double}>'], timeout = 120.0)
     except asyncio.TimeoutError:
         print('timeout')
+        await timeoutGame()
     else:
         if str(reaction) == f'<{constants.hit}>':
             return 'hit'
@@ -122,6 +135,10 @@ async def playerTurn(ctx,deck,playerHand,playerValue):
             return 'stand'
         if str(reaction) == f'<{constants.double}>':
             return 'double'
+
+# TIMEOUT
+async def timeoutGame():
+    None
 
 # DEALER DRAW CARDS
 async def dealerDraw(deck,dealerHand,dealerValue):
@@ -211,8 +228,6 @@ async def deckCreation(deck):
 # NOT IN USE CURRENTLY - INVALID ARGUMENTS
 async def invalidArguments(ctx):
     await ctx.send(f'<@{ctx.author.id}> Invalid arguments do -help for a list of commands')
-
-
 
 if __name__ == "__main__":
     with open(constants.tokenPath,"r") as token:
