@@ -39,10 +39,11 @@ async def daily(ctx, *args):
 @bot.command()
 async def play(ctx, *args):
     await accountExists(ctx)
+# LOAD DECK AND PLAYER PROFILE
     deck = await deckCreation(constants.deck)
     with open (f'{constants.userSavePath}{ctx.author.id}.txt','r') as f:
         stuff = json.load(f)
-
+# TABLE START SCREEN
     menu = discord.Embed(
         description = f"""WELCOME <@{ctx.author.id}> TO THE TABLE
             2:3 PAYOUT ON BLACKJACK
@@ -54,15 +55,45 @@ async def play(ctx, *args):
     menu.set_author(name=f"{ctx.author.name} ", icon_url=ctx.author.avatar_url)
     ui = await ctx.send(embed=menu)
     await asyncio.sleep(3)
-    
+#GAME LOGIC
+    PlayerTurn = True
+    DealerTurn = False
+    roundEnd = False
+    gameEnd = False # end whole game
     dealerHand = []
     playerHand = []
     dealerValue = 0
     playerValue = 0
-    deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
-    for i in range(2):
-        deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
 
+# DEAL STARTING HANDS
+    deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue) #order : players -> dealer(FU) -> players -> dealer(FD)
+    deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
+    deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+    # >>>>> dealer face down <<<<< #
+
+    while roundEnd == False:
+        await updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui)
+        if DealerTurn:
+            deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
+            DealerTurn = False
+            PlayerTurn = True
+            continue
+        if PlayerTurn:
+            choice = await playerTurn(ctx,deck,playerHand,playerValue)
+            if choice == 'hit':
+                deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+            if choice == 'stand':
+                None
+            if choice == 'double':
+                None 
+            PlayerTurn = False
+            DealerTurn = True
+            continue
+
+
+#FUNCTIONS
+# UPDATE THE TABLE
+async def updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui):
     table = discord.Embed(
         description = f"""<@{ctx.author.id}>
         
@@ -78,8 +109,6 @@ async def play(ctx, *args):
     await ui.add_reaction(constants.stand)
     await ui.add_reaction(constants.double)
 
-    deck,playerHand,playerValue = await playerTurn(ctx,deck,playerHand,playerValue)
-
 # PLAYER TURN TO HIT/STAND/DOUBLE
 async def playerTurn(ctx,deck,playerHand,playerValue):
     try:
@@ -87,12 +116,12 @@ async def playerTurn(ctx,deck,playerHand,playerValue):
     except asyncio.TimeoutError:
         print('timeout')
     else:
-        if reaction == f'<{constants.hit}>':
-            return deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
-        if reaction == f'<{constants.stand}>':
-            return deck,playerHand,playerValue
-        if reaction == f'<{constants.double}>':
-            return deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+        if str(reaction) == f'<{constants.hit}>':
+            return 'hit'
+        if str(reaction) == f'<{constants.stand}>':
+            return 'stand'
+        if str(reaction) == f'<{constants.double}>':
+            return 'double'
 
 # DEALER DRAW CARDS
 async def dealerDraw(deck,dealerHand,dealerValue):
@@ -179,11 +208,9 @@ async def deckCreation(deck):
         bigDeck.pop(card)
     return deck
 
-# NOT IN USE CURRENTLY
+# NOT IN USE CURRENTLY - INVALID ARGUMENTS
 async def invalidArguments(ctx):
     await ctx.send(f'<@{ctx.author.id}> Invalid arguments do -help for a list of commands')
-
-
 
 
 
