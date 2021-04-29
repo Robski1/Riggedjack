@@ -6,7 +6,7 @@ bot.remove_command('help')
 async def on_ready():
     await bot.change_presence(activity=discord.Game('-help'))
     print('Bot is online ')
-    
+
 @bot.command()
 async def help(ctx, *args):
     await accountExists(ctx)
@@ -34,7 +34,27 @@ async def daily(ctx, *args):
         await ctx.send(embed=embed)
         await addChips(ctx, chips, daily)
     else:
-        await nextDailyClaim(ctx)        
+        await nextDailyClaim(ctx)
+
+@bot.command()
+async def profile(ctx, *args):
+    await accountExists(ctx)
+    with open (f'{constants.userSavePath}{ctx.author.id}.txt','r') as f:
+        stuff = json.load(f)
+    embed = discord.Embed(
+        description = f'`PROFILE`',
+        colour = discord.Colour.purple()
+        )
+    embed.set_author(name=f'{ctx.author.name} ', icon_url=ctx.author.avatar_url)
+    embed.add_field(name='Balance: ',value=f"{stuff['account']['balance']}")
+    embed.add_field(name='Wins: ',value=f"{stuff['account']['wins']}")
+    embed.add_field(name='Losses: ',value=f"{stuff['account']['losses']}")
+    embed.add_field(name='Blackjacks: ',value=f"{stuff['account']['blackJacks']}")
+    embed.add_field(name='Busts: ',value=f"{stuff['account']['busts']}")
+    embed.add_field(name='Total Games: ',value=f"{stuff['account']['totalGames']}")
+    embed.add_field(name='Win Percentage: ',value=f"{stuff['account']['winPercent']}%")
+    embed.add_field(name='Membership: ',value=f"{stuff['account']['membership']}")
+    await ctx.send(embed=embed)
 
 @bot.command()
 async def play(ctx, *args):
@@ -45,59 +65,71 @@ async def play(ctx, *args):
         stuff = json.load(f)
 # TABLE START SCREEN
     menu = discord.Embed(
-        description = f"""WELCOME <@{ctx.author.id}> TO THE TABLE
-            2:3 PAYOUT ON BLACKJACK
-            DEALER STANDS ON 17
-        
-        """,
+        description = f"""WELCOME <@{ctx.author.id}> TO THE TABLE""",
         colour = discord.Colour.purple()
         )
     menu.set_author(name=f"{ctx.author.name} ", icon_url=ctx.author.avatar_url)
+    menu.set_image(url='https://i.imgur.com/m5m7lza.png')
     ui = await ctx.send(embed=menu)
-    await asyncio.sleep(3)
+    await asyncio.sleep(7)
 #GAME LOGIC
-    PlayerTurn = True
-    DealerTurn = False
-    hasDouble = False
-    roundEnd = False
-    gameEnd = False # end whole game
-    dealerHand = []
-    playerHand = []
-    dealerValue = 0
-    playerValue = 0
+    gameEnd = False
+    while gameEnd == False:
+        PlayerTurn = True
+        DealerTurn = False
+        hasDouble = False
+        roundEnd = False
+        dealerHand = []
+        playerHand = []
+        dealerValue = 0
+        playerValue = 0
 
-# DEAL STARTING HANDS
-    deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue) #order : players -> dealer(FU) -> players -> dealer(FD)
-    deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
-    deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
-    # >>>>> dealer face down <<<<< #
+    # DEAL STARTING HANDS
+        deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue) #order : players -> dealer(FU) -> players -> dealer(FD)
+        deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
+        deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+        # >>>>> dealer face down <<<<< #
 
-    while roundEnd == False:
-        await updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui,PlayerTurn,hasDouble)
-        if DealerTurn:
-            deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
-            DealerTurn = False
-            PlayerTurn = True
-            continue
-        if hasDouble:
-            PlayerTurn = False
-            DealerTurn = True
-            continue
-        if PlayerTurn:
-            choice = await playerTurn(ctx,deck,playerHand,playerValue)
-            if choice == 'hit':
-                deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
-            if choice == 'stand':
-                None
-            if choice == 'double':
-                deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
-                hasDouble = True
-            PlayerTurn = False
-            DealerTurn = True
-            continue
-
+        while roundEnd == False:
+            await updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui,PlayerTurn,hasDouble)
+            if DealerTurn:
+                deck,dealerHand,dealerValue = await dealerDraw(deck,dealerHand,dealerValue)
+                DealerTurn = False
+                PlayerTurn = True
+                continue
+            if hasDouble:
+                PlayerTurn = False
+                DealerTurn = True
+                continue
+            if PlayerTurn:
+                choice = await playerTurn(ctx,deck,playerHand,playerValue)
+                if choice == 'hit':
+                    deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+                if choice == 'stand':
+                    None
+                if choice == 'double':
+                    deck,playerHand,playerValue = await playerDraw(deck,playerHand,playerValue)
+                    hasDouble = True
+                PlayerTurn = False
+                DealerTurn = True
+                continue
+        if len(deck) <= 60:
+            await reshuffleDeckScreen(ctx,ui)
+            deck = await deckCreation(constants.deck)
 
 #FUNCTIONS
+# RESHUFFLE DECK SCREEN
+async def reshuffleDeckScreen(ctx,ui):
+    table = discord.Embed(
+        description = f"""<@{ctx.author.id}>
+        PLEASE WAIT WHILE THE DEALER RESHUFFLES THE DECK
+        """,
+        colour = discord.Colour.purple()
+        )
+    table.set_author(name=f"{ctx.author.name} ", icon_url=ctx.author.avatar_url)    
+    await ui.edit(embed=table)
+    await asyncio.sleep(7)
+
 # UPDATE THE TABLE
 async def updateTable(ctx,dealerHand,dealerValue,playerHand,playerValue,ui,PlayerTurn,hasDouble):
     table = discord.Embed(
@@ -200,11 +232,26 @@ async def addChips(ctx, chips, daily):
         with open (f'{constants.userSavePath}{ctx.author.id}.txt','w') as f:
             json.dump(stuff,f, indent=4)
 
-#CALCULATES TIME UNTIL NEXT CLAIM
+# DIFFRENCE IN TIME FROM COMMAND AND LAST CLAIM
+async def dateDiffInSeconds(date1, date2):
+    timedelta = date2 - date1
+    return timedelta.days * 24 * 3600 + timedelta.seconds
+
+# CONVERTING SECONDS INTO READABLE TIME
+async def daysHoursMinutesSecondsFromSeconds(seconds):
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    return (days, hours, minutes, seconds)
+
+# CALCULATES TIME UNTIL NEXT CLAIM
 async def nextDailyClaim(ctx):
     with open (f'{constants.userSavePath}{ctx.author.id}.txt','r') as f:
         stuff = json.load(f)
-    await ctx.send(f"<@{ctx.author.id}> You can do -daily when it is {stuff['account']['lastDailyClaimTime']}")
+    now = datetime.now()
+    lastClaim = datetime.strptime(stuff['account']['lastDailyClaimTime'],'%H:%M:%S')
+    dateFormat = await daysHoursMinutesSecondsFromSeconds(await dateDiffInSeconds(now, lastClaim))
+    await ctx.send(f"<@{ctx.author.id}> You can do -daily in {dateFormat[1]} hours {dateFormat[2]} minutes {dateFormat[3]} seconds")
     
 # WAIT A DAY FOR DAILY TO RESET
 async def wait1day(ctx):
