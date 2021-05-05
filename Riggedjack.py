@@ -43,7 +43,7 @@ async def profile(ctx, *args):
     if len(args) > 0:
         try:
             user = await bot.fetch_user(args[0].strip("<@!>"))
-            if user not in os.listdir(constants.userSavePath):
+            if f'{user.id}.txt' not in os.listdir(constants.userSavePath):
                 await makeSave(user)
         except:
             await ctx.send('cannot find user')
