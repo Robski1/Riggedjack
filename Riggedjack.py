@@ -39,13 +39,22 @@ async def daily(ctx, *args):
 @bot.command()
 async def profile(ctx, *args):
     await accountExists(ctx)
-    with open (f'{constants.userSavePath}{ctx.author.id}.txt','r') as f:
+    user = ctx.author
+    if len(args) > 0:
+        try:
+            user = await bot.fetch_user(args[0].strip("<@!>"))
+            if user not in os.listdir(constants.userSavePath):
+                await makeSave(user)
+        except:
+            await ctx.send('cannot find user')
+            return None
+    with open (f'{constants.userSavePath}{user.id}.txt','r') as f:
         stuff = json.load(f)
     embed = discord.Embed(
         description = f'`PROFILE`',
         colour = discord.Colour.purple()
         )
-    embed.set_author(name=f'{ctx.author.name} ', icon_url=ctx.author.avatar_url)
+    embed.set_author(name=f'{user.name} ', icon_url=user.avatar_url)
     embed.add_field(name='Balance: ',value=f"{stuff['account']['balance']}")
     embed.add_field(name='Wins: ',value=f"{stuff['account']['wins']}")
     embed.add_field(name='Losses: ',value=f"{stuff['account']['losses']}")
@@ -55,7 +64,7 @@ async def profile(ctx, *args):
     embed.add_field(name='Win Percentage: ',value=f"{stuff['account']['winPercent']}%")
     embed.add_field(name='Membership: ',value=f"{stuff['account']['membership']}")
     await ctx.send(embed=embed)
-
+    
 @bot.command()
 async def play(ctx, *args):
     await accountExists(ctx)
@@ -188,11 +197,15 @@ async def playerDraw(deck,playerHand,playerValue):
 
 # CREATE ACCOUNT
 async def makeSave(ctx):
+    if type(ctx) == discord.ext.commands.context.Context:
+        user = ctx.author
+    else:
+        user = ctx
     stuff = {}
     stuff['account'] = {}
     stuff['account'].update({
-        'accountName' : f'{ctx.author.name}',
-        'accountId' : f'{ctx.author.id}',
+        'accountName' : f'{user.name}',
+        'accountId' : f'{user.id}',
         'membership' : 'coming soon',
         'balance' : 100000,
         'totalGames' : 0,
@@ -205,7 +218,7 @@ async def makeSave(ctx):
         'lastDailyClaimTime' : '00:00:00'
     })
     
-    with open (f'{constants.userSavePath}{ctx.author.id}.txt','w') as f:
+    with open (f'{constants.userSavePath}{user.id}.txt','w') as f:
         json.dump(stuff,f, indent=4)
 
 # CHECK IF ACCOUNT EXISTS, IF NOT CREATE ONE
